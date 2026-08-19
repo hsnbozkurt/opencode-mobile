@@ -39,7 +39,7 @@ const config: ExpoConfig = {
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    softwareKeyboardLayoutMode: 'resize',
+    softwareKeyboardLayoutMode: 'pan',
   },
   web: {
     output: 'static',
