@@ -59,10 +59,11 @@ case "$ARCH" in
   x86_64)  BUN_ZIP="bun-linux-x64-android.zip";    FFI_BIN="" ;;
   *) echo "[setup] unsupported arch: $ARCH"; exit 1 ;;
 esac
+echo "[setup] installing packages (unzip, git, ripgrep)..."
+pkg install -y unzip git ripgrep
 if [ ! -x "$PREFIX/libexec/bun/bun" ]; then
   echo "[setup] installing Bun ${BUN_VERSION} ($ARCH)..."
   mkdir -p "$PREFIX/libexec/bun" "${TERMUX_PREFIX}/tmp/bun-setup"
-  pkg install -y unzip
   curl -fsSL -o "${TERMUX_PREFIX}/tmp/bun-setup/bun.zip" "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/\${BUN_ZIP}"
   cd "${TERMUX_PREFIX}/tmp/bun-setup" && unzip -o bun.zip
   case "$ARCH" in
@@ -86,8 +87,6 @@ if [ -n "$FFI_BIN" ]; then
 else
   "$BUN" add --ignore-scripts @ff-labs/fff-bun@${FFI_BUN_VERSION} || "$BUN" add --ignore-scripts --no-cache @ff-labs/fff-bun@${FFI_BUN_VERSION}
 fi
-echo "[setup] installing ripgrep..."
-pkg install -y ripgrep
 mkdir -p "$HOME_DIR/.termux"
 if ! grep -q '^allow-external-apps=' "$HOME_DIR/.termux/termux.properties" 2>/dev/null; then
   printf '\\nallow-external-apps=true\\n' >> "$HOME_DIR/.termux/termux.properties"
