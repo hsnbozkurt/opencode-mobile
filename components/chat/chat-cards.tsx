@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Chip, Divider, IconButton, List, Surface, Text, TextInput, TouchableRipple } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Chip, Divider, IconButton, List, Surface, Text, TextInput, TouchableRipple } from 'react-native-paper';
 
 import { MarkdownText } from '@/components/chat/chat-markdown';
 import { getDiffPalette, buildPatchDiff, buildCollapsedDiffBlocks } from '@/components/chat/chat-diff';
@@ -9,8 +9,20 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { PendingPermissionRequest, PendingQuestionAnswer, PendingQuestionRequest } from '@/lib/opencode/client';
 import { formatTimestamp, type TranscriptDetail, type TranscriptEntry } from '@/lib/opencode/format';
-import { summarizeTranscriptDetails } from '@/lib/opencode/transcript';
+import { getTranscriptActivityRows, summarizeTranscriptDetails } from '@/lib/opencode/transcript';
 import type { FileDiff } from '@/lib/opencode/types';
+
+const ACTIVITY_ICONS: Record<TranscriptDetail['kind'], ComponentProps<typeof MaterialCommunityIcons>['name']> = {
+  tool: 'cog-outline',
+  patch: 'file-edit-outline',
+  file: 'file-outline',
+  reasoning: 'brain',
+  step: 'run',
+  subtask: 'file-tree',
+  agent: 'account-outline',
+  retry: 'refresh',
+  compaction: 'collapse-all-outline',
+};
 
 function getPermissionTitle(request: PendingPermissionRequest) {
   return request.permission
@@ -245,6 +257,37 @@ export function DiffCard({ detail, expanded, onPress }: { detail: Extract<Transc
   );
 }
 
+export function ActivityFeed({ details }: { details: TranscriptDetail[] }) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const palette = Colors[colorScheme];
+  const rows = useMemo(() => getTranscriptActivityRows(details), [details]);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={[styles.activityFeed, { borderColor: palette.border, backgroundColor: palette.background }]}>
+      {rows.map((row) => (
+        <View key={row.id} style={styles.activityRow}>
+          <MaterialCommunityIcons
+            name={ACTIVITY_ICONS[row.kind]}
+            size={14}
+            color={row.status === 'error' ? palette.danger : palette.muted}
+          />
+          <Text variant="labelSmall" style={[styles.activityVerb, { color: palette.muted }]}>{row.verb}</Text>
+          <Text variant="labelSmall" numberOfLines={1} ellipsizeMode="tail" style={[styles.activityTarget, { color: palette.text }]}>
+            {row.target}
+          </Text>
+          {row.status === 'running' ? <ActivityIndicator size={10} color={palette.tint} /> : null}
+          {row.status === 'completed' ? <MaterialCommunityIcons name="check-circle-outline" size={14} color={palette.tint} /> : null}
+          {row.status === 'error' ? <MaterialCommunityIcons name="alert-circle-outline" size={14} color={palette.danger} /> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function TranscriptMessage({
   canSpeak = false,
   copied = false,
@@ -316,6 +359,7 @@ export function TranscriptMessage({
             />
           ) : null}
           {entry.error ? <Text variant="bodyMedium" style={{ color: palette.danger }}>{entry.error}</Text> : null}
+          {!isUser && entry.details.length > 0 ? <ActivityFeed details={entry.details} /> : null}
           {!isUser && detailSummary.length > 0 ? (
             <View style={styles.summaryRow}>
               {detailSummary.map((item) => (
@@ -403,6 +447,10 @@ const styles = StyleSheet.create({
   copiedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   summaryChip: { alignSelf: 'flex-start' },
+  activityFeed: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6, gap: 6 },
+  activityRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  activityVerb: { width: 84 },
+  activityTarget: { flex: 1, fontFamily: 'monospace' },
   requestCard: { borderRadius: 18 },
   requestCardCompact: { borderRadius: 14 },
   requestCardContent: { gap: 10 },

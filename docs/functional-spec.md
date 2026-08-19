@@ -100,7 +100,7 @@ The Chat screen shows:
 Behavior details:
 
 - only user messages and assistant messages with text or errors appear in the main transcript
-- reasoning and tool activity are summarized and attached to assistant messages as metadata chips
+- reasoning and tool activity are summarized as metadata chips AND rendered as a per-assistant-message activity feed (one row per tool call, patch, file, reasoning block, or step, with live status icons), matching the web transcript's detail level
 - a status line like `OpenCode is ...` is shown while running and not blocked on user input
 - if the assistant is blocked on a permission or question, a waiting card and inline interaction render
 

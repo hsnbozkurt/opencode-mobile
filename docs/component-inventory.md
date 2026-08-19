@@ -200,6 +200,7 @@ type ChatHeaderProps = {
 - `SessionDiffCard`
 - `DiffCard`
 - `TranscriptMessage`
+- `ActivityFeed`
 
 ### `PendingInteractionsCard`
 
@@ -225,7 +226,13 @@ Responsibility:
 Responsibility:
 
 - render one display transcript bubble
-- show copy state, optional TTS button, fork/revert actions for user messages, timestamp, markdown text, error, and summary chips
+- show copy state, optional TTS button, fork/revert actions for user messages, timestamp, markdown text, error, summary chips, and the per-message activity feed
+
+### `ActivityFeed`
+
+Responsibility:
+
+- render a terse per-message activity feed derived from transcript details (one row per tool call, patch, file, reasoning, subtask, step, agent, retry, or compaction) with live status icons
 
 ## `components/chat/chat-markdown.tsx`
 

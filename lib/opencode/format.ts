@@ -7,7 +7,7 @@ export type SessionMessageRecord = {
 
 export type TranscriptDetail =
   | { id: string; kind: 'reasoning'; label: string; body: string }
-  | { id: string; kind: 'tool'; label: string; body: string; status: string }
+  | { id: string; kind: 'tool'; toolName: string; label: string; body: string; status: string }
   | { id: string; kind: 'patch'; label: string; body: string }
   | { id: string; kind: 'file'; label: string; body: string }
   | { id: string; kind: 'subtask'; label: string; body: string }
@@ -196,6 +196,7 @@ export function toTranscriptEntry(record: SessionMessageRecord): TranscriptEntry
       details.push({
         id,
         kind: 'tool',
+        toolName: part.tool,
         label: getToolTitle(part),
         body: getToolBody(part),
         status: part.state.status,

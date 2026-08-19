@@ -126,9 +126,14 @@ If this app were reimplemented, this provider would be the main source of truth 
 - `lib/opencode/format.ts`
   Converts raw message records into transcript entries and helper labels.
 - `lib/opencode/transcript.ts`
-  Transcript activity helpers and display filtering.
+  Transcript activity helpers (including the per-message activity-row builder), and display filtering.
 - `lib/opencode/types.ts`
   Direct aliases for generated v2 SDK protocol types.
+
+### On-device Server Helpers
+
+- `lib/termux.ts`
+  On-device OpenCode via Termux: `TERMUX_SERVER_URL` constants, the pinned idempotent setup script, and typed status/launch helpers (`TermuxStatus`, `TermuxLaunchResult`). The Android-only native launcher lives in `modules/termux-launcher/` and is surfaced in the Settings `ConnectionSection`. Termux orchestration is a UI + lib concern; the provider is not involved beyond connecting to the local server URL.
 
 ### Chat UI
 
