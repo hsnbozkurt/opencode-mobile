@@ -135,10 +135,13 @@ import {
   findFiles,
   getFileStatus,
   getVcsInfo,
+  initProjectGit,
+  listDirectory,
   listWorktrees as svcListWorktrees,
   readFile,
   removeWorktree as svcRemoveWorktree,
   resetWorktree as svcResetWorktree,
+  searchDirectories,
 } from '@/providers/services/workspace-service';
 import {
   addMcpServer as svcAddMcpServer,
@@ -833,6 +836,19 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
     await svcRemoveWorktree(client, directory);
     await Promise.all([refreshWorktrees(), refreshWorkspaceCatalog(true)]);
   }, [client, refreshWorktrees, refreshWorkspaceCatalog]);
+
+  const browseServerDirectory = useCallback(async (directory: string, path = '') => {
+    return await listDirectory(client, directory, path);
+  }, [client]);
+
+  const searchServerDirectories = useCallback(async (query: string, directory: string) => {
+    return await searchDirectories(client, query, directory);
+  }, [client]);
+
+  const addProject = useCallback(async (directory: string) => {
+    await initProjectGit(client, directory);
+    await refreshWorkspaceCatalog(true);
+  }, [client, refreshWorkspaceCatalog]);
 
   const refreshMcpServers = useCallback(async () => {
     const next = await getMcpStatus(client);
@@ -2555,6 +2571,9 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
       createWorktree,
       resetWorktree,
       removeWorktree,
+      browseServerDirectory,
+      searchServerDirectories,
+      addProject,
       mcpStatuses,
       refreshMcpServers,
       addMcpServer,
@@ -2678,6 +2697,9 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
       createWorktree,
       resetWorktree,
       removeWorktree,
+      browseServerDirectory,
+      searchServerDirectories,
+      addProject,
       mcpStatuses,
       refreshMcpServers,
       addMcpServer,

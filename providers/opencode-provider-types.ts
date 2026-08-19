@@ -4,6 +4,7 @@ import type {
   File,
   FileContent,
   FileDiff,
+  FileNode,
   GlobalSession,
   McpLocalConfig,
   McpRemoteConfig,
@@ -183,6 +184,9 @@ export type OpencodeContextValue = {
   createWorktree: (name?: string, startCommand?: string) => Promise<void>;
   resetWorktree: (directory: string) => Promise<void>;
   removeWorktree: (directory: string) => Promise<void>;
+  browseServerDirectory: (directory: string, path?: string) => Promise<FileNode[]>;
+  searchServerDirectories: (query: string, directory: string) => Promise<string[]>;
+  addProject: (directory: string) => Promise<void>;
   mcpStatuses: Record<string, McpStatus>;
   refreshMcpServers: () => Promise<void>;
   addMcpServer: (name: string, config: McpLocalConfig | McpRemoteConfig) => Promise<void>;

@@ -1,10 +1,23 @@
-import type { OpencodeClient } from '@opencode-ai/sdk/v2/client';
+import type { FileNode, OpencodeClient } from '@opencode-ai/sdk/v2/client';
 
 function requireData<T>(data: T | undefined, operation: string): T {
   if (data === undefined) {
     throw new Error(`OpenCode ${operation} returned no data.`);
   }
   return data;
+}
+
+export async function listDirectory(client: OpencodeClient, directory: string, path = '') {
+  return requireData((await client.file.list({ path, directory })).data, 'directory list');
+}
+
+export async function searchDirectories(client: OpencodeClient, query: string, directory: string, limit = 50) {
+  const results = requireData((await client.find.files({ query, dirs: 'true', limit, directory })).data, 'directory search');
+  return results.filter((entry) => /[\\/]$/.test(entry)).map((entry) => entry.replace(/[\\/]$/, ''));
+}
+
+export async function initProjectGit(client: OpencodeClient, directory: string) {
+  return requireData((await client.project.initGit({ directory })).data, 'project git init');
 }
 
 export async function findFiles(client: OpencodeClient, query: string, includeDirectories = false) {

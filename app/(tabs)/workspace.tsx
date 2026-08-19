@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,10 +9,12 @@ import {
   Appbar,
   Button,
   Card,
+  Dialog,
   Divider,
   IconButton,
   List,
   Menu,
+  Portal,
   SegmentedButtons,
   Snackbar,
   Text,
@@ -22,7 +24,7 @@ import {
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { formatRelativeTime, getSessionSubtitle } from '@/lib/opencode/format';
-import type { Session } from '@/lib/opencode/types';
+import type { FileNode, Session } from '@/lib/opencode/types';
 import { useOpencode } from '@/providers/opencode-provider';
 
 export default function WorkspaceScreen() {
@@ -70,6 +72,9 @@ export default function WorkspaceScreen() {
     createWorktree,
     resetWorktree,
     removeWorktree,
+    browseServerDirectory,
+    searchServerDirectories,
+    addProject,
   } = useOpencode();
   const [isCreating, setIsCreating] = useState(false);
   const [activePanel, setActivePanel] = useState<'chats' | 'files' | 'tools'>('chats');
@@ -88,6 +93,15 @@ export default function WorkspaceScreen() {
   const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
   const [isRefreshingWorktrees, setIsRefreshingWorktrees] = useState(false);
   const [updatingWorktree, setUpdatingWorktree] = useState<string>();
+  const [projectPickerVisible, setProjectPickerVisible] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerRoot, setPickerRoot] = useState<string>();
+  const [pickerDir, setPickerDir] = useState<string>();
+  const [pickerEntries, setPickerEntries] = useState<FileNode[]>([]);
+  const [pickerResults, setPickerResults] = useState<string[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerAdding, setPickerAdding] = useState<string>();
+  const pickerSearchTimer = useRef<number | undefined>(undefined);
   const [error, setError] = useState<string>();
 
   const isRefreshing = isRefreshingSessions || isRefreshingWorkspaceCatalog;
@@ -115,6 +129,78 @@ export default function WorkspaceScreen() {
       setError(reason instanceof Error ? reason.message : 'Could not create a session.');
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  function parentDirectory(dir: string) {
+    const normalized = dir.replace(/[\\/]+$/, '');
+    const idx = Math.max(normalized.lastIndexOf('\\'), normalized.lastIndexOf('/'));
+    return idx > 0 ? normalized.slice(0, idx + 1) : undefined;
+  }
+
+  function joinServerPath(root: string, rel: string) {
+    const separator = /^[A-Za-z]:/.test(root) ? '\\' : '/';
+    return root.replace(/[\\/]+$/, '') + separator + rel.replace(/[\\/]/g, separator);
+  }
+
+  async function loadPickerListing(directory: string) {
+    setPickerLoading(true);
+    try {
+      setPickerEntries(await browseServerDirectory(directory));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not list the folder.');
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  function openProjectPicker() {
+    setPickerQuery('');
+    setPickerResults([]);
+    const start = serverRootPath || activeProject?.path || currentProjectPath;
+    if (!start) {
+      setError('The server root folder is unknown.');
+      return;
+    }
+    setPickerRoot(start);
+    setPickerDir(start);
+    setProjectPickerVisible(true);
+    void loadPickerListing(start);
+  }
+
+  function handlePickerQueryChange(value: string) {
+    setPickerQuery(value);
+    if (pickerSearchTimer.current) {
+      clearTimeout(pickerSearchTimer.current);
+      pickerSearchTimer.current = undefined;
+    }
+    if (!value.trim() || !pickerRoot) {
+      setPickerResults([]);
+      return;
+    }
+    pickerSearchTimer.current = setTimeout(() => {
+      void searchServerDirectories(value.trim(), pickerRoot)
+        .then((paths) => setPickerResults(paths.map((path) => joinServerPath(pickerRoot, path))))
+        .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not search folders.'));
+    }, 300);
+  }
+
+  async function handleAddProject(directory: string) {
+    setPickerAdding(directory);
+    try {
+      await addProject(directory);
+      selectProject(directory);
+      if (pickerSearchTimer.current) {
+        clearTimeout(pickerSearchTimer.current);
+        pickerSearchTimer.current = undefined;
+      }
+      setProjectPickerVisible(false);
+      setPickerQuery('');
+      setPickerResults([]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not add the project.');
+    } finally {
+      setPickerAdding(undefined);
     }
   }
 
@@ -266,6 +352,8 @@ export default function WorkspaceScreen() {
             }>
             {projects.length === 0 ? <Menu.Item title="No projects available" disabled /> : null}
             {projects.map((project) => <Menu.Item key={project.path} title={project.label} leadingIcon={project.path === activeProject?.path ? 'check' : undefined} onPress={() => { setProjectMenuVisible(false); selectProject(project.path); }} />)}
+            {projects.length > 0 ? <Divider /> : null}
+            <Menu.Item title="Add project…" leadingIcon="folder-plus-outline" onPress={() => { setProjectMenuVisible(false); openProjectPicker(); }} />
           </Menu>
         </View>
         <View style={styles.headerActions}>
@@ -444,6 +532,102 @@ export default function WorkspaceScreen() {
         </Card.Content>
       </Card> : null}
       </ScrollView>
+      <Portal>
+        <Dialog visible={projectPickerVisible} onDismiss={() => setProjectPickerVisible(false)}>
+          <Dialog.Title>Add project</Dialog.Title>
+          <Dialog.Content style={styles.pickerContent}>
+            <TextInput
+              testID="workspace-project-picker-search"
+              mode="outlined"
+              dense
+              placeholder="Search folders on the server"
+              value={pickerQuery}
+              onChangeText={handlePickerQueryChange}
+            />
+            {pickerQuery.trim() ? null : (
+              <View style={styles.pickerPathRow}>
+                <IconButton
+                  testID="workspace-project-picker-up"
+                  icon="arrow-up"
+                  accessibilityLabel="Parent folder"
+                  disabled={!pickerDir || !parentDirectory(pickerDir)}
+                  onPress={() => {
+                    if (!pickerDir) {
+                      return;
+                    }
+                    const up = parentDirectory(pickerDir);
+                    if (up) {
+                      setPickerDir(up);
+                      void loadPickerListing(up);
+                    }
+                  }}
+                />
+                <Text numberOfLines={1} variant="bodySmall" style={[styles.pickerPath, { color: palette.muted }]}>{pickerDir}</Text>
+              </View>
+            )}
+            <ScrollView style={styles.pickerList} nestedScrollEnabled>
+              {pickerLoading ? (
+                <ActivityIndicator style={styles.pickerLoading} color={palette.tint} />
+              ) : pickerQuery.trim() ? (
+                pickerResults.length === 0 ? (
+                  <Text style={[styles.pickerEmpty, { color: palette.muted }]}>No folders match “{pickerQuery}”.</Text>
+                ) : (
+                  pickerResults.map((path) => (
+                    <List.Item
+                      key={path}
+                      title={path.split(/[\\/]/).pop() || path}
+                      description={path}
+                      titleStyle={{ color: palette.text }}
+                      descriptionStyle={{ color: palette.muted }}
+                      right={() => (
+                        <IconButton
+                          icon="folder-plus-outline"
+                          accessibilityLabel={`Add project ${path}`}
+                          loading={pickerAdding === path}
+                          disabled={pickerAdding !== undefined}
+                          onPress={() => void handleAddProject(path)}
+                        />
+                      )}
+                      onPress={() => {
+                        if (!pickerAdding) void handleAddProject(path);
+                      }}
+                    />
+                  ))
+                )
+              ) : pickerEntries.length === 0 ? (
+                <Text style={[styles.pickerEmpty, { color: palette.muted }]}>No folders found.</Text>
+              ) : (
+                pickerEntries
+                  .filter((entry) => entry.type === 'directory')
+                  .sort((left, right) => (Number(left.name.startsWith('.')) - Number(right.name.startsWith('.'))) || left.name.localeCompare(right.name))
+                  .map((entry) => (
+                    <List.Item
+                      key={entry.absolute}
+                      title={entry.name}
+                      titleStyle={{ color: palette.text }}
+                      right={() => (
+                        <IconButton
+                          icon="folder-plus-outline"
+                          accessibilityLabel={`Add project ${entry.absolute}`}
+                          loading={pickerAdding === entry.absolute}
+                          disabled={pickerAdding !== undefined}
+                          onPress={() => void handleAddProject(entry.absolute)}
+                        />
+                      )}
+                      onPress={() => {
+                        setPickerDir(entry.absolute);
+                        void loadPickerListing(entry.absolute);
+                      }}
+                    />
+                  ))
+              )}
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setProjectPickerVisible(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
       <Snackbar visible={Boolean(error)} onDismiss={() => setError(undefined)}>{error}</Snackbar>
     </>
   );
@@ -484,4 +668,10 @@ const styles = StyleSheet.create({
   worktreeSection: { gap: 8 },
   worktreeForm: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   code: { fontFamily: 'monospace', fontSize: 12 },
+  pickerContent: { gap: 4 },
+  pickerPathRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  pickerPath: { flex: 1, minWidth: 0 },
+  pickerList: { maxHeight: 420 },
+  pickerLoading: { padding: 24 },
+  pickerEmpty: { padding: 12 },
 });
