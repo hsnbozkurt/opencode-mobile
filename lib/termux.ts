@@ -51,10 +51,10 @@ case "$ARCH" in
 esac
 if [ ! -x "$PREFIX/libexec/bun/bun" ]; then
   echo "[setup] installing Bun ${BUN_VERSION} ($ARCH)..."
-  mkdir -p "$PREFIX/libexec/bun" /tmp/bun-setup
+  mkdir -p "$PREFIX/libexec/bun" "${TERMUX_PREFIX}/tmp/bun-setup"
   pkg install -y unzip
-  curl -fsSL -o /tmp/bun-setup/bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/\${BUN_ZIP}"
-  cd /tmp/bun-setup && unzip -o bun.zip
+  curl -fsSL -o "${TERMUX_PREFIX}/tmp/bun-setup/bun.zip" "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/\${BUN_ZIP}"
+  cd "${TERMUX_PREFIX}/tmp/bun-setup" && unzip -o bun.zip
   case "$ARCH" in
     aarch64) cp bun-linux-aarch64-android/bun "$PREFIX/libexec/bun/bun" ;;
     x86_64)  cp bun-linux-x64-android/bun "$PREFIX/libexec/bun/bun" ;;
