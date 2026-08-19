@@ -34,6 +34,7 @@ export function ChatView() {
     configuredProviders,
     createSession,
     conversation,
+    currentProjectPath,
     clearConversationFeedback,
     clearPromptError,
     currentDiffs,
@@ -561,7 +562,15 @@ export function ChatView() {
           onToggleAutoApprove={() => {
             setIsUpdatingAutoApprove(true);
             void setAutoApprove(!chatPreferences.autoApprove)
-              .catch((error) => setSendFeedback(error instanceof Error ? error.message : 'Could not update auto-approve.'))
+              .catch(() => {
+                const inGlobalFolder =
+                  !currentProjectPath || currentProjectPath === '/' || currentProjectPath === 'C:\\' || currentProjectPath === 'C:/';
+                setSendFeedback(
+                  inGlobalFolder
+                    ? "Couldn't update auto-approve: you're in the OpenCode server's global folder, and it can't save config changes there. Open the Workspace tab, select a project folder, then try again."
+                    : "Couldn't update auto-approve: the OpenCode server rejected the config change. Check the server logs and try again.",
+                );
+              })
               .finally(() => setIsUpdatingAutoApprove(false));
           }}
           onToggleRecording={() => void handleToggleRecording()}
