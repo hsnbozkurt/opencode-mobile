@@ -11,10 +11,15 @@ function fail(message) {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    stdio: 'inherit',
-    ...options,
-  });
+  const opts = { stdio: 'inherit', ...options };
+  // Windows: spawnSync cannot launch .cmd shims (npx, gradlew) directly (EINVAL);
+  // run them through cmd.exe so PATH + .cmd resolution work. cmd.exe also
+  // rejects the Unix './' prefix, so strip it.
+  if (process.platform === 'win32') {
+    opts.shell = true;
+    command = command.replace(/^\.\//, '');
+  }
+  const result = spawnSync(command, args, opts);
 
   if (result.status !== 0) {
     fail(`Command failed: ${command} ${args.join(' ')}`);
