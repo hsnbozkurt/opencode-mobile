@@ -1,6 +1,7 @@
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -447,6 +448,14 @@ export default function SettingsScreen() {
               palette={palette}
             />
             <DiagnosticsSection diagnostics={diagnostics} eventStreamStatus={eventStreamStatus} onRefresh={() => void refreshDiagnostics()} palette={palette} />
+            <List.Item
+              title="Performance history"
+              description="Request timings, slow frames, and memory samples"
+              titleStyle={{ color: palette.text }}
+              descriptionStyle={{ color: palette.muted }}
+              left={(props) => <List.Icon {...props} icon="chart-line" color={palette.tint} />}
+              onPress={() => router.push('/performance')}
+            />
           </List.Accordion>
         </List.AccordionGroup>
 

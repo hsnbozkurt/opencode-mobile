@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getPaperTheme } from '@/constants/paper-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { initPerformanceMonitoring } from '@/lib/performance';
 import { OpencodeProvider } from '@/providers/opencode-provider';
 
 export const unstable_settings = {
@@ -21,6 +22,8 @@ export default function RootLayout() {
   const isE2EMode = Boolean(Constants.expoConfig?.extra?.e2eMode);
 
   useEffect(() => {
+    initPerformanceMonitoring();
+
     if (Platform.OS === 'web' || isE2EMode) {
       return;
     }
@@ -41,6 +44,7 @@ export default function RootLayout() {
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="performance" options={{ title: 'Performance' }} />
             </Stack>
             <StatusBar style="auto" />
           </ThemeProvider>

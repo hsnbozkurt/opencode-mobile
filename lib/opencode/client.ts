@@ -8,6 +8,8 @@ import {
 import { encode as encodeBase64 } from 'base-64';
 import Constants from 'expo-constants';
 
+import { recordRequest } from '@/lib/performance';
+
 export type PendingPermissionRequest = PermissionRequest;
 export type PendingQuestionRequest = QuestionRequest;
 export type PendingQuestionAnswer = QuestionAnswer;
@@ -92,17 +94,25 @@ function createScopedFetch(baseUrl: string, pathPrefix: string, directory?: stri
       parsed.searchParams.set('directory', directory);
     }
 
-    if (typeof input === 'string' || input instanceof URL) {
-      return fetch(parsed.toString(), init);
+    const startedAt = performance.now();
+    const method = (init?.method || (typeof input === 'object' && 'method' in input ? input.method : 'GET') || 'GET').toUpperCase();
+    const path = parsed.pathname;
+    try {
+      const response = await (typeof input === 'string' || input instanceof URL
+        ? fetch(parsed.toString(), init)
+        : fetch(parsed.toString(), {
+            body: input.method === 'GET' || input.method === 'HEAD' ? undefined : await input.text(),
+            credentials: input.credentials,
+            headers: input.headers,
+            method: input.method,
+            signal: input.signal,
+          }));
+      recordRequest({ t: Date.now(), method, path, status: response.status, ms: performance.now() - startedAt });
+      return response;
+    } catch (error) {
+      recordRequest({ t: Date.now(), method, path, status: null, ms: performance.now() - startedAt, error: true });
+      throw error;
     }
-
-    return fetch(parsed.toString(), {
-      body: input.method === 'GET' || input.method === 'HEAD' ? undefined : await input.text(),
-      credentials: input.credentials,
-      headers: input.headers,
-      method: input.method,
-      signal: input.signal,
-    });
   };
 }
 
