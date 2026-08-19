@@ -83,7 +83,13 @@ export async function discoverChatCapabilities(client: OpencodeClient, activePro
       configured: configuredProviderIds.has(provider.id),
     }))
     .sort((left, right) => left.label.localeCompare(right.label)));
-  const nextAgents = uniqueById(agentData.map(toAgentOption));
+  // Only agents usable as an assistant mode: primary/all agents, excluding
+  // internal ones (compaction, summary, title) and subagents (explore, general).
+  const nextAgents = uniqueById(
+    agentData
+      .filter((agent) => agent.mode !== 'subagent' && !agent.hidden)
+      .map(toAgentOption),
+  );
 
   return {
     config: nextConfig,
