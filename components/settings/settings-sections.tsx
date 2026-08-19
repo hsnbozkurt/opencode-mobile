@@ -1,3 +1,4 @@
+import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch as NativeSwitch, Text as NativeText, View } from 'react-native';
 import {
@@ -21,6 +22,7 @@ import {
   getTermuxStatus,
   startTermuxServer,
   startTermuxSetup,
+  TERMUX_ALLOW_EXTERNAL_APPS_COMMAND,
   TERMUX_SERVER_URL,
   type TermuxLaunchResult,
   type TermuxStatus,
@@ -85,6 +87,7 @@ export function ConnectionSection({ connection, isConnecting, onReconnect, palet
   const [termuxStatus, setTermuxStatus] = useState<TermuxStatus | undefined>(undefined);
   const [termuxBusy, setTermuxBusy] = useState<'idle' | 'setup' | 'start'>('idle');
   const [termuxMessage, setTermuxMessage] = useState<string | undefined>(undefined);
+  const [termuxCmdCopied, setTermuxCmdCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +126,9 @@ export function ConnectionSection({ connection, isConnecting, onReconnect, palet
     }
     setTermuxBusy('idle');
     updateSettings({ serverUrl: TERMUX_SERVER_URL });
-    setTermuxMessage(`Server starting on ${TERMUX_SERVER_URL}. Reconnecting...`);
+    setTermuxMessage(
+      `Server starting on ${TERMUX_SERVER_URL}. Reconnecting... If it stays disconnected, run the allow-external-apps command inside Termux (above) and restart Termux.`,
+    );
     onReconnect();
   };
 
@@ -204,6 +209,31 @@ export function ConnectionSection({ connection, isConnecting, onReconnect, palet
           description={termuxStatus ? (termuxStatus.hasRunCommandPermission ? 'Granted' : 'Missing com.termux.permission.RUN_COMMAND') : 'Checking...'}
           right={() => <Chip compact>{termuxStatus ? (termuxStatus.hasRunCommandPermission ? 'OK' : 'Denied') : '…'}</Chip>}
         />
+        {termuxStatus?.installed ? (
+          <View style={styles.termuxHint}>
+            <Text variant="bodySmall" style={{ color: palette.muted }}>
+              Termux rejects RUN_COMMAND unless allow-external-apps=true is set. Run this once inside a Termux session (paste it there, not here), then restart Termux:
+            </Text>
+            <View style={styles.termuxCmdRow}>
+              <NativeText numberOfLines={1} ellipsizeMode="middle" style={[styles.termuxCmd, { color: palette.text }]}>
+                {TERMUX_ALLOW_EXTERNAL_APPS_COMMAND}
+              </NativeText>
+              <Button
+                compact
+                mode="text"
+                disabled={termuxCmdCopied}
+                onPress={() => {
+                  Clipboard.setStringAsync(TERMUX_ALLOW_EXTERNAL_APPS_COMMAND).then(() => {
+                    setTermuxCmdCopied(true);
+                    setTimeout(() => setTermuxCmdCopied(false), 2000);
+                  });
+                }}
+              >
+                {termuxCmdCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </View>
+          </View>
+        ) : null}
         <Text variant="bodySmall" style={{ color: palette.muted }}>
           Set up once, then Start launches OpenCode inside Termux on this phone. The app connects to the server locally.
         </Text>
@@ -724,6 +754,9 @@ const styles = StyleSheet.create({
   inlineSelectButtonLabel: { fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  termuxHint: { gap: 6, marginTop: 8 },
+  termuxCmdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  termuxCmd: { flex: 1, fontFamily: Fonts.mono, fontSize: 11 },
   infoListSection: { marginVertical: 0 },
   settingSelectField: { borderRadius: 14, borderWidth: 1 },
   settingSelectFieldContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 54, paddingHorizontal: 14, paddingVertical: 10 },

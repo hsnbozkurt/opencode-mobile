@@ -20,6 +20,16 @@ export const TERMUX_SERVER_URL = `http://127.0.0.1:${TERMUX_SERVER_PORT}`;
 
 export const TERMUX_RUN_COMMAND_PERMISSION = 'com.termux.permission.RUN_COMMAND';
 
+/**
+ * One-liner to run inside a Termux session. RUN_COMMAND is rejected by Termux
+ * itself until `allow-external-apps=true` is set, even when the runtime
+ * permission is granted — and Termux rejects those intents asynchronously, so
+ * the app cannot detect the missing property. The user pastes this in Termux,
+ * then restarts Termux (its properties are cached per-process).
+ */
+export const TERMUX_ALLOW_EXTERNAL_APPS_COMMAND =
+  "mkdir -p ~/.termux && printf '\\nallow-external-apps=true\\n' >> ~/.termux/termux.properties";
+
 const TERMUX_PREFIX = '/data/data/com.termux/files/usr';
 const TERMUX_HOME = '/data/data/com.termux/files/home';
 const TERMUX_BUN = `${TERMUX_PREFIX}/libexec/bun/bun`;
