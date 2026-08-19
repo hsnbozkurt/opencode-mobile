@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch as NativeSwitch, Text as NativeText, View } from 'react-native';
 import {
   Button,
@@ -17,6 +17,14 @@ import { Colors, Fonts } from '@/constants/theme';
 import { formatTimestamp } from '@/lib/opencode/format';
 import type { NotificationDebugStatus } from '@/lib/notifications';
 import type { OpencodeConnectionSettings } from '@/lib/opencode/client';
+import {
+  getTermuxStatus,
+  startTermuxServer,
+  startTermuxSetup,
+  TERMUX_SERVER_URL,
+  type TermuxLaunchResult,
+  type TermuxStatus,
+} from '@/lib/termux';
 import type { SpeechVoiceOption } from '@/lib/voice/speech-output';
 import type { WorkingSoundVariant } from '@/lib/voice/working-sound';
 import type { ChatPreferences, ModelOption, ProviderOption, ResponseScope } from '@/providers/opencode-provider';
@@ -62,7 +70,63 @@ type ConnectionSectionProps = {
   updateSettings: (patch: Partial<OpencodeConnectionSettings>) => void;
 };
 
+function describeTermuxLaunchFailure(result: Extract<TermuxLaunchResult, { ok: false }>) {
+  switch (result.reason) {
+    case 'termux-not-installed':
+      return 'Termux is not installed. Install it from F-Droid, then press Set up again.';
+    case 'permission-denied':
+      return 'Run command access is missing. Grant this app the com.termux.permission.RUN_COMMAND permission, then retry.';
+    case 'launch-failed':
+      return result.detail ? `Failed to start Termux: ${result.detail}` : 'Failed to start Termux.';
+  }
+}
+
 export function ConnectionSection({ connection, isConnecting, onReconnect, palette, settings, updateSettings }: ConnectionSectionProps) {
+  const [termuxStatus, setTermuxStatus] = useState<TermuxStatus | undefined>(undefined);
+  const [termuxBusy, setTermuxBusy] = useState<'idle' | 'setup' | 'start'>('idle');
+  const [termuxMessage, setTermuxMessage] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTermuxStatus().then((status) => {
+      if (!cancelled) {
+        setTermuxStatus(status);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleTermuxSetup = async () => {
+    setTermuxBusy('setup');
+    setTermuxMessage(undefined);
+    const result = await startTermuxSetup();
+    if (!result.ok) {
+      setTermuxMessage(describeTermuxLaunchFailure(result));
+      setTermuxBusy('idle');
+      return;
+    }
+    setTermuxStatus(await getTermuxStatus());
+    setTermuxBusy('idle');
+    setTermuxMessage('Setup is running in a visible Termux session. Wait for it to finish, then press Start server.');
+  };
+
+  const handleTermuxStart = async () => {
+    setTermuxBusy('start');
+    setTermuxMessage(undefined);
+    const result = await startTermuxServer();
+    if (!result.ok) {
+      setTermuxMessage(describeTermuxLaunchFailure(result));
+      setTermuxBusy('idle');
+      return;
+    }
+    setTermuxBusy('idle');
+    updateSettings({ serverUrl: TERMUX_SERVER_URL });
+    setTermuxMessage(`Server starting on ${TERMUX_SERVER_URL}. Reconnecting...`);
+    onReconnect();
+  };
+
   return (
     <Card mode="contained" style={[styles.card, { backgroundColor: palette.surface }]}>
       <Card.Content style={styles.section}>
@@ -129,6 +193,33 @@ export function ConnectionSection({ connection, isConnecting, onReconnect, palet
         <Button testID="settings-reconnect-button" mode="contained" loading={isConnecting} onPress={onReconnect}>
           Reconnect
         </Button>
+        <Text variant="titleMedium" style={[styles.title, { color: palette.text }]}>On-device server</Text>
+        <List.Item
+          title="Termux"
+          description={termuxStatus ? (termuxStatus.installed ? `Installed${termuxStatus.termuxVersion ? ` (${termuxStatus.termuxVersion})` : ''}` : 'Not installed') : 'Checking...'}
+          right={() => <Chip compact>{termuxStatus ? (termuxStatus.installed ? 'OK' : 'Missing') : '…'}</Chip>}
+        />
+        <List.Item
+          title="Run command access"
+          description={termuxStatus ? (termuxStatus.hasRunCommandPermission ? 'Granted' : 'Missing com.termux.permission.RUN_COMMAND') : 'Checking...'}
+          right={() => <Chip compact>{termuxStatus ? (termuxStatus.hasRunCommandPermission ? 'OK' : 'Denied') : '…'}</Chip>}
+        />
+        <Text variant="bodySmall" style={{ color: palette.muted }}>
+          Set up once, then Start launches OpenCode inside Termux on this phone. The app connects to the server locally.
+        </Text>
+        <View style={styles.actionRow}>
+          <Button mode="outlined" disabled={termuxBusy !== 'idle'} loading={termuxBusy === 'setup'} onPress={handleTermuxSetup}>
+            Set up on-device server
+          </Button>
+          <Button mode="contained" disabled={termuxBusy !== 'idle'} loading={termuxBusy === 'start'} onPress={handleTermuxStart}>
+            Start server
+          </Button>
+        </View>
+        {termuxMessage ? (
+          <Text variant="bodySmall" style={{ color: palette.muted }}>
+            {termuxMessage}
+          </Text>
+        ) : null}
       </Card.Content>
     </Card>
   );

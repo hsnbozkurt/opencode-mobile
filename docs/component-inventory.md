@@ -376,6 +376,7 @@ Responsibility:
 - show connection state card
 - show the current connection message or error hint from provider state
 - trigger reconnect
+- on-device Termux card: show whether Termux is installed and RUN_COMMAND is granted, run the one-shot setup script in a visible Termux session, start the on-device server in a background session, and switch the server URL to `http://127.0.0.1:4096`
 
 ### `AiDefaultsSection`
 
@@ -606,6 +607,25 @@ The context includes active/archived session lifecycle, commands, workspace edit
 ### Responsibility
 
 - load health, MCP, LSP, and formatter status independently so one unavailable endpoint does not hide the others
+
+## `lib/termux.ts`
+
+### Responsibility
+
+- the only JS entry point for on-device Termux OpenCode
+- `TERMUX_SERVER_URL` / `TERMUX_SERVER_PORT` (on-device server address)
+- `TERMUX_SETUP_SCRIPT`: idempotent one-shot device setup (Bun android binary, opencode clone pinned at `v1.18.18`, dependency install, fff-bun android bump, ripgrep, `allow-external-apps=true`)
+- `getTermuxStatus()`: `TermuxStatus` discriminated status (installed, RUN_COMMAND granted, version)
+- `startTermuxSetup()` / `startTermuxServer()`: `TermuxLaunchResult` launch results with `termux-not-installed` / `permission-denied` / `launch-failed` reasons
+
+## `modules/termux-launcher/`
+
+### Responsibility
+
+- Android expo module (`TermuxLauncher`) wrapping Termux `RunCommandService`
+- `getStatus()`: package-installed check plus RUN_COMMAND permission check
+- `launch(request)`: start a Termux session (`executable`, `args`, `workdir`, `environment`, `background`) with RUN_COMMAND extras
+- declares `com.termux.permission.RUN_COMMAND` (also added by the `withTermuxRunCommandPermission` config plugin)
 
 ## Regeneration Notes
 

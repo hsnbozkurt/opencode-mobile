@@ -74,5 +74,10 @@
     "typescript": "~5.9.2",
     "ws": "^8.21.1"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "modules"
+    }
+  }
 }

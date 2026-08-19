@@ -1,0 +1,9 @@
+{
+  "name": "termux-launcher",
+  "version": "0.1.0",
+  "description": "Native launcher for Termux RunCommandService (on-device OpenCode server)",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

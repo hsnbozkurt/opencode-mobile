@@ -26,6 +26,30 @@ Default server URL:
 - or `expoConfig.extra.e2eServerUrl`
 - or fallback `http://127.0.0.1:4096`
 
+### On-device Server (Termux)
+
+The app can run an OpenCode server inside Termux on the same Android device. This is the fail-safe when no host server is reachable and is the documented "zero-infrastructure" mode.
+
+Deployment model (device-verified):
+
+- opencode v1.18.18 runs from source under the official Android Bun v1.3.14 build
+- Bun standalone artifacts (`bun build --compile`) segfault at pre-init on Android (Bun bug; there is no released fix as of 1.3.14), so there is no bundled binary
+- the fff-bun dependency is bumped to 0.10.5 (plus the android `fff-bin` package) because 0.9.4 ships no android target
+
+Flow:
+
+1. User taps "Set up on-device server" in Settings → the app launches a visible Termux session running the pinned setup script (Bun install, opencode clone at tag `v1.18.18`, dependency install, ripgrep, `allow-external-apps=true`).
+2. User taps "Start server" → a background Termux session runs the serve command from a `/sdcard` working directory (Bun's startup probe walks up from cwd and aborts inside `/data`, so the server cannot run from Termux home).
+3. The app switches the server URL to `http://127.0.0.1:4096` and reconnects.
+
+Requirements:
+
+- Termux installed (F-Droid build recommended)
+- `com.termux.permission.RUN_COMMAND` granted to this app
+- `allow-external-apps=true` in Termux properties (script sets it)
+
+Native plumbing: `modules/termux-launcher/` (expo module with `getStatus`/`launch`), the `withTermuxRunCommandPermission` config plugin, and `lib/termux.ts` (constants, setup script, typed helpers). The `TermuxStatus`/`TermuxLaunchResult` discriminated unions are the wrapper contract; UI lives in `ConnectionSection`.
+
 ### Authentication
 
 If a password is present, the app sends:
@@ -140,6 +164,10 @@ The Settings screen uses:
 
 These support app settings, notification settings, battery settings, and provider or remote-MCP OAuth browser flows. Code-based OAuth flows show an authorization-code input and call the corresponding callback.
 
+### Termux Launch
+
+The Android-only `termux-launcher` expo module (in `modules/`) launches Termux `RunCommandService` sessions. It is used for on-device OpenCode setup and serving. The native side checks whether Termux is installed and whether `com.termux.permission.RUN_COMMAND` is granted; `lib/termux.ts` is the only JS entry point for both status checks and launches.
+
 ## OpenCode Compatibility
 
 The client is implemented against the current `@opencode-ai/sdk` 1.18.3 contract and uses generated SDK types rather than permissive legacy endpoint shims. It is latest-only support: older server shapes and removed endpoint forms are not compatibility targets.
@@ -154,6 +182,7 @@ Notable values:
 - E2E mode controlled by `EXPO_PUBLIC_E2E_MODE=1`
 - Android package name varies between production and development variants
 - Expo Router, notifications, background task, speech recognition, and splash plugins are configured
+- `withTermuxRunCommandPermission` adds the `com.termux.permission.RUN_COMMAND` uses-permission to the Android manifest (alongside the module's own manifest declaration)
 - React compiler and typed routes are enabled in Expo experiments
 
 ## Environment / Variant Rules

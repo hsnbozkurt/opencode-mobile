@@ -65,3 +65,6 @@ config.json
 # Google Play / service account JSONs
 google-play-service-account.json
 service-account*.json
+
+# termux-launcher module gradle outputs
+modules/termux-launcher/android/build/

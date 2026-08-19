@@ -320,6 +320,7 @@ Responsibilities:
 
 - edit connection settings
 - reconnect manually
+- set up and start the on-device Termux server; switch the server URL to the local `http://127.0.0.1:4096`
 - inspect server health, realtime status, LSP, and formatter counts
 - add local or remote MCP servers; connect, disconnect, enable, disable, and complete remote OAuth
 - configure providers

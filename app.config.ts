@@ -21,6 +21,23 @@ const withCleartextTraffic = (config: ExpoConfig) => withAndroidManifest(config,
   return config;
 });
 
+const TERMUX_RUN_COMMAND_PERMISSION = 'com.termux.permission.RUN_COMMAND';
+
+const withTermuxRunCommandPermission = (config: ExpoConfig) => withAndroidManifest(config, (config) => {
+  const manifest = config.modResults.manifest;
+  const usesPermissions = manifest['uses-permission'] ?? [];
+  const alreadyDeclared = usesPermissions.some(
+    (entry) => entry.$['android:name'] === TERMUX_RUN_COMMAND_PERMISSION,
+  );
+  if (!alreadyDeclared) {
+    manifest['uses-permission'] = [
+      ...usesPermissions,
+      { $: { 'android:name': TERMUX_RUN_COMMAND_PERMISSION } },
+    ];
+  }
+  return config;
+});
+
 const config: ExpoConfig = {
   name: isDevelopmentVariant ? 'OpenCode Mobile Dev' : 'OpenCode Mobile',
   slug: 'opencode-mobile',
@@ -77,6 +94,7 @@ const config: ExpoConfig = {
       },
     ],
     withCleartextTraffic as unknown as string,
+    withTermuxRunCommandPermission as unknown as string,
   ],
   experiments: {
     typedRoutes: true,
