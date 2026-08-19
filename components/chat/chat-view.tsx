@@ -12,6 +12,7 @@ import { TopTab } from '@/components/chat/chat-controls';
 import { styles } from '@/components/chat/chat-view-styles';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { type TranscriptEntry } from '@/lib/opencode/format';
 import { getTranscriptActivityLabel, isTranscriptDisplayMessage } from '@/lib/opencode/transcript';
 import { speakText, stopSpeaking } from '@/lib/voice/speech-output';
@@ -22,6 +23,7 @@ export function ChatView() {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const {
     activeSession,
     availableAgents,
@@ -421,8 +423,8 @@ export function ChatView() {
   return (
     <>
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: palette.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.screen, { backgroundColor: palette.background, paddingBottom: Platform.OS === 'android' ? keyboardInset : 0 }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
         <ChatHeader
           connectionStatus={connection.status}

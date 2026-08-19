@@ -24,12 +24,14 @@ import {
 
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import type { Pty } from '@/lib/opencode/types';
 import { useOpencode } from '@/providers/opencode-provider';
 
 export default function TerminalScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
   const outputRef = useRef<ScrollView>(null);
@@ -150,8 +152,8 @@ export default function TerminalScreen() {
   return (
     <>
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: palette.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.screen, { backgroundColor: palette.background, paddingBottom: Platform.OS === 'android' ? keyboardInset : 0 }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
         <Appbar.Header
           style={[styles.header, { backgroundColor: palette.surface, paddingTop: insets.top, height: 64 + insets.top }]}
