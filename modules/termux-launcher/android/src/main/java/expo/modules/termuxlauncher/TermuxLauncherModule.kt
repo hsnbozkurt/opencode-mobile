@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import expo.modules.interfaces.permissions.Permissions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
@@ -95,7 +96,15 @@ class TermuxLauncherModule : Module() {
         }
       }
       return@AsyncFunction try {
-        val started = ctx.startService(intent)
+        // API 26+ denies plain startService for services that can be foreground
+        // (Termux RunCommandService): "Not allowed to start service ... app is in
+        // background uid null". startForegroundService is required and safe here —
+        // RunCommandService calls startForeground() itself before forwarding.
+        val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          ctx.startForegroundService(intent)
+        } else {
+          ctx.startService(intent)
+        }
         if (started != null) {
           mapOf("ok" to true)
         } else {
