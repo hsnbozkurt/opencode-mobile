@@ -19,6 +19,9 @@ import { speakText, stopSpeaking } from '@/lib/voice/speech-output';
 import { useSpeechInput } from '@/lib/voice/use-speech-input';
 import { useOpencode } from '@/providers/opencode-provider';
 
+const AUTO_APPROVE_GLOBAL_FOLDER_ERROR =
+  "Couldn't update auto-approve: you're in the OpenCode server's global folder, and it can't save config changes there. Open the Workspace tab, select a project folder, then try again.";
+
 export function ChatView() {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
@@ -514,9 +517,11 @@ export function ChatView() {
               <Text variant="titleSmall" style={{ color: palette.danger }}>Action failed</Text>
               <Text selectable variant="bodySmall" style={{ color: palette.text }}>{sendErrorMessage}</Text>
               <View style={styles.sendErrorActions}>
-                <Button compact onPress={() => {
-                  void Clipboard.setStringAsync(sendErrorDetails).then(() => setCopiedMessageId('__send-error__'));
-                }}>Copy details</Button>
+                {sendErrorMessage !== AUTO_APPROVE_GLOBAL_FOLDER_ERROR ? (
+                  <Button compact onPress={() => {
+                    void Clipboard.setStringAsync(sendErrorDetails).then(() => setCopiedMessageId('__send-error__'));
+                  }}>Copy details</Button>
+                ) : null}
                 <Button compact onPress={() => {
                   setSendFeedback(undefined);
                   clearPromptError();
@@ -567,7 +572,7 @@ export function ChatView() {
                   !currentProjectPath || currentProjectPath === '/' || currentProjectPath === 'C:\\' || currentProjectPath === 'C:/';
                 setSendFeedback(
                   inGlobalFolder
-                    ? "Couldn't update auto-approve: you're in the OpenCode server's global folder, and it can't save config changes there. Open the Workspace tab, select a project folder, then try again."
+                    ? AUTO_APPROVE_GLOBAL_FOLDER_ERROR
                     : "Couldn't update auto-approve: the OpenCode server rejected the config change. Check the server logs and try again.",
                 );
               })
