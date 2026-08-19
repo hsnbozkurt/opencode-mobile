@@ -75,7 +75,7 @@ function describeTermuxLaunchFailure(result: Extract<TermuxLaunchResult, { ok: f
     case 'termux-not-installed':
       return 'Termux is not installed. Install it from F-Droid, then press Set up again.';
     case 'permission-denied':
-      return 'Run command access is missing. Grant this app the com.termux.permission.RUN_COMMAND permission, then retry.';
+      return 'Run command access was not granted. The permission dialog was shown — press Start server again to re-ask, or grant it manually in Settings → Apps → OpenCode Mobile → Permissions.';
     case 'launch-failed':
       return result.detail ? `Failed to start Termux: ${result.detail}` : 'Failed to start Termux.';
   }

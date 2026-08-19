@@ -4,6 +4,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import expo.modules.interfaces.permissions.Permissions
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Field
@@ -59,6 +61,15 @@ class TermuxLauncherModule : Module() {
         "hasRunCommandPermission" to hasPermission,
         "termuxVersion" to version,
       )
+    }
+
+    /**
+     * Shows the system runtime-permission dialog for com.termux.permission.RUN_COMMAND.
+     * Resolves when the user answers; `granted` is false if Termux is not installed
+     * (a permission nobody declares cannot be granted) or the user denies.
+     */
+    AsyncFunction("requestRunCommandPermission") { promise: Promise ->
+      Permissions.askForPermissionsWithPermissionsManager(appContext.permissions, promise, RUN_COMMAND_PERMISSION)
     }
 
     AsyncFunction("launch") { request: LaunchRequest ->

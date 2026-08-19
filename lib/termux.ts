@@ -110,6 +110,7 @@ export type TermuxLaunchResult =
 
 type TermuxLauncherModule = {
   getStatus(): Promise<TermuxStatus>;
+  requestRunCommandPermission(): Promise<{ granted: boolean }>;
   launch(request: {
     executable: string;
     args: string[];
@@ -142,6 +143,38 @@ export async function getTermuxStatus(): Promise<TermuxStatus> {
   return module.getStatus();
 }
 
+export async function requestTermuxRunCommandPermission(): Promise<boolean> {
+  const module = getTermuxLauncher();
+  if (!module) {
+    return false;
+  }
+  const result = await module.requestRunCommandPermission();
+  return result.granted;
+}
+
+/**
+ * Ensures the RUN_COMMAND grant before a launch, showing the system
+ * permission dialog when it is missing. Returns an error result instead of
+ * null when the launch cannot proceed (Termux missing or permission refused).
+ */
+async function ensureTermuxReady(): Promise<TermuxLaunchResult | null> {
+  const module = getTermuxLauncher();
+  if (!module) {
+    return { ok: false, reason: 'launch-failed', detail: 'Termux launcher unavailable on this platform.' };
+  }
+  const status = await module.getStatus();
+  if (!status.installed) {
+    return { ok: false, reason: 'termux-not-installed' };
+  }
+  if (!status.hasRunCommandPermission) {
+    const granted = await requestTermuxRunCommandPermission();
+    if (!granted) {
+      return { ok: false, reason: 'permission-denied', detail: 'Run command access was not granted.' };
+    }
+  }
+  return null;
+}
+
 function createLaunchRequest(script: string, background: boolean) {
   return {
     executable: TERMUX_SHELL,
@@ -152,6 +185,10 @@ function createLaunchRequest(script: string, background: boolean) {
 }
 
 export async function startTermuxSetup(): Promise<TermuxLaunchResult> {
+  const blocker = await ensureTermuxReady();
+  if (blocker) {
+    return blocker;
+  }
   const module = getTermuxLauncher();
   if (!module) {
     return { ok: false, reason: 'launch-failed', detail: 'Termux launcher unavailable on this platform.' };
@@ -160,6 +197,10 @@ export async function startTermuxSetup(): Promise<TermuxLaunchResult> {
 }
 
 export async function startTermuxServer(): Promise<TermuxLaunchResult> {
+  const blocker = await ensureTermuxReady();
+  if (blocker) {
+    return blocker;
+  }
   const module = getTermuxLauncher();
   if (!module) {
     return { ok: false, reason: 'launch-failed', detail: 'Termux launcher unavailable on this platform.' };
