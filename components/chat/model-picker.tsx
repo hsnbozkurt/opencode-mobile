@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ControlButton } from '@/components/chat/chat-controls';
 import { renderProviderIcon } from '@/components/ui/provider-icon';
@@ -52,6 +52,10 @@ export function ModelPicker({ disabled = false, models, onSelect, selectedModelI
 
     return [...groups.entries()].map(([providerID, group]) => ({ providerID, ...group }));
   }, [matchingModels]);
+  const sections = useMemo(
+    () => providerGroups.map((group) => ({ title: group.label, providerID: group.providerID, data: group.models })),
+    [providerGroups],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -112,44 +116,50 @@ export function ModelPicker({ disabled = false, models, onSelect, selectedModelI
                   onChangeText={setQuery}
                 />
               </View>
-              <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="always" style={styles.results}>
-                {providerGroups.map((group) => (
-                  <View key={group.providerID} style={styles.group}>
-                    <View style={styles.groupHeader}>
-                      <View style={[styles.groupIcon, { backgroundColor: `${palette.tint}14` }]}>
-                        {renderProviderIcon(group.providerID, 18, palette.tint)}
+              <SectionList
+                contentContainerStyle={styles.list}
+                initialNumToRender={12}
+                keyboardShouldPersistTaps="always"
+                keyExtractor={(model) => model.id}
+                maxToRenderPerBatch={12}
+                renderItem={({ item: model }) => {
+                  const isSelected = model.id === selectedModelId;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => select(model)}
+                      style={({ pressed }) => [
+                        styles.option,
+                        { backgroundColor: isSelected ? palette.background : palette.surface, borderColor: isSelected ? palette.tint : palette.border },
+                        pressed && styles.pressed,
+                      ]}>
+                      <View style={styles.optionText}>
+                        <Text style={[styles.optionLabel, { color: palette.text }]}>{model.label}</Text>
+                        <Text style={[styles.optionDescription, { color: palette.muted }]}>{model.modelID}{model.supportsReasoning ? ' · Reasoning supported' : ' · Standard model'}</Text>
                       </View>
-                      <Text style={[styles.groupTitle, { color: palette.text }]}>{group.label}</Text>
+                      {isSelected ? <MaterialCommunityIcons name="check" size={20} color={palette.tint} /> : null}
+                    </Pressable>
+                  );
+                }}
+                renderSectionHeader={({ section }) => (
+                  <View style={styles.groupHeader}>
+                    <View style={[styles.groupIcon, { backgroundColor: `${palette.tint}14` }]}>
+                      {renderProviderIcon(section.providerID, 18, palette.tint)}
                     </View>
-                    {group.models.map((model) => {
-                      const isSelected = model.id === selectedModelId;
-                      return (
-                        <Pressable
-                          key={model.id}
-                          accessibilityRole="button"
-                          onPress={() => select(model)}
-                          style={({ pressed }) => [
-                            styles.option,
-                            { backgroundColor: isSelected ? palette.background : palette.surface, borderColor: isSelected ? palette.tint : palette.border },
-                            pressed && styles.pressed,
-                          ]}>
-                          <View style={styles.optionText}>
-                            <Text style={[styles.optionLabel, { color: palette.text }]}>{model.label}</Text>
-                            <Text style={[styles.optionDescription, { color: palette.muted }]}>{model.modelID}{model.supportsReasoning ? ' · Reasoning supported' : ' · Standard model'}</Text>
-                          </View>
-                          {isSelected ? <MaterialCommunityIcons name="check" size={20} color={palette.tint} /> : null}
-                        </Pressable>
-                      );
-                    })}
+                    <Text style={[styles.groupTitle, { color: palette.text }]}>{section.title}</Text>
                   </View>
-                ))}
-                {matchingModels.length === 0 ? (
+                )}
+                sections={sections}
+                stickySectionHeadersEnabled={false}
+                style={styles.results}
+                windowSize={5}
+                ListEmptyComponent={
                   <View style={styles.empty}>
                     <Text style={[styles.emptyTitle, { color: palette.text }]}>No matching models</Text>
                     <Text style={[styles.emptyBody, { color: palette.muted }]}>Try a model or provider name.</Text>
                   </View>
-                ) : null}
-              </ScrollView>
+                }
+              />
           </View>
         </View>
       </Modal>
