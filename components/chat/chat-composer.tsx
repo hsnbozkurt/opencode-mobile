@@ -117,7 +117,7 @@ export function ChatComposer({
         <SelectControl
           grow
           iconName="brain"
-          label={chatPreferences.reasoning}
+          label={REASONING_OPTIONS.find((option) => option.id === chatPreferences.reasoning)?.label ?? chatPreferences.reasoning}
           onValueChange={(value) => updateChatPreferences({ reasoning: value })}
           options={REASONING_OPTIONS.map((option) => ({ value: option.id, label: option.label }))}
           selectedValue={chatPreferences.reasoning}
