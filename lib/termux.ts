@@ -52,6 +52,9 @@ set -e
 PREFIX=${TERMUX_PREFIX}
 HOME_DIR=${TERMUX_HOME}
 BUN="$PREFIX/libexec/bun/bun"
+# Some devices reject the hardlinks bun's installer creates (EACCES:
+# Permission denied). Force the copy backend for install/add.
+export BUN_OPTIONS="--backend=copyfile"
 ARCH=$(uname -m)
 echo "[setup] arch=$ARCH"
 case "$ARCH" in
