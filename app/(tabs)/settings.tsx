@@ -20,6 +20,7 @@ import {
 
 import { Colors, Fonts } from '@/constants/theme';
 import { ProviderConfigDialog } from '@/components/settings/provider-config-dialog';
+import { CustomProviderDialog } from '@/components/settings/custom-provider-dialog';
 import { McpSection } from '@/components/settings/mcp-section';
 import {
   AiDefaultsSection,
@@ -41,6 +42,7 @@ import {
   type NotificationDebugStatus,
 } from '@/lib/notifications';
 import { getSpeechVoiceOptions, type SpeechVoiceOption } from '@/lib/voice/speech-output';
+import type { CustomProviderInput } from '@/lib/opencode/client';
 import { useOpencode } from '@/providers/opencode-provider';
 
 export default function SettingsScreen() {
@@ -56,6 +58,7 @@ export default function SettingsScreen() {
     completeProviderOAuth,
     completeMcpOAuth,
     configuredProviders,
+    addCustomProvider,
     connectMcpServer,
     currentConfig,
     providerAuthMethodsById,
@@ -83,6 +86,9 @@ export default function SettingsScreen() {
   const [authValues, setAuthValues] = useState<Record<string, string>>({});
   const [isConfiguringProvider, setIsConfiguringProvider] = useState(false);
   const [providerDialogError, setProviderDialogError] = useState<string>();
+  const [isCustomProviderDialogVisible, setIsCustomProviderDialogVisible] = useState(false);
+  const [isSubmittingCustomProvider, setIsSubmittingCustomProvider] = useState(false);
+  const [customProviderError, setCustomProviderError] = useState<string>();
   const [providerFeedback, setProviderFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string }>();
   const [expandedProviderId, setExpandedProviderId] = useState<string>();
   const [notificationStatus, setNotificationStatus] = useState<NotificationDebugStatus>();
@@ -348,8 +354,8 @@ export default function SettingsScreen() {
   function handleRemoveProvider(providerId: string) {
     const label = getProviderCopy(providerId, providerId).label;
     const remove = () => void removeProvider(providerId)
-      .then(() => setProviderFeedback({ type: 'success', message: `${label} credentials were removed.` }))
-      .catch((error) => setProviderFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Could not remove provider credentials.' }));
+      .then(() => setProviderFeedback({ type: 'success', message: `${label} was removed.` }))
+      .catch((error) => setProviderFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Could not remove the provider.' }));
     if (Platform.OS === 'web') {
       if (globalThis.confirm(`Remove ${label}?\n\nStored credentials and provider configuration will be removed.`)) remove();
       return;
@@ -358,6 +364,20 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: remove },
     ]);
+  }
+
+  async function handleAddCustomProvider(input: CustomProviderInput) {
+    setIsSubmittingCustomProvider(true);
+    setCustomProviderError(undefined);
+    try {
+      await addCustomProvider(input);
+      setIsCustomProviderDialogVisible(false);
+      setProviderFeedback({ type: 'success', message: `${input.name} was added as a custom provider.` });
+    } catch (error) {
+      setCustomProviderError(error instanceof Error ? error.message : 'Could not add the custom provider.');
+    } finally {
+      setIsSubmittingCustomProvider(false);
+    }
   }
 
   return (
@@ -394,6 +414,7 @@ export default function SettingsScreen() {
               configuredProviders={configuredProviders}
               enabledModelIds={enabledModelIds}
               expandedProviderId={expandedProviderId}
+              onAddCustomProvider={() => setIsCustomProviderDialogVisible(true)}
               onExpandedProviderChange={setExpandedProviderId}
               onModelToggle={handleModelToggle}
               onRemoveProvider={handleRemoveProvider}
@@ -462,6 +483,17 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <Portal>
+        <CustomProviderDialog
+          isSubmitting={isSubmittingCustomProvider}
+          onDismiss={() => {
+            setIsCustomProviderDialogVisible(false);
+            setCustomProviderError(undefined);
+          }}
+          onSubmit={(input) => void handleAddCustomProvider(input)}
+          palette={palette}
+          submitError={customProviderError}
+          visible={isCustomProviderDialogVisible}
+        />
         <Dialog visible={Boolean(pendingOAuth)} onDismiss={dismissPendingOAuth}>
           <Dialog.Title>Complete provider sign-in</Dialog.Title>
           <Dialog.Content>

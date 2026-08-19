@@ -19,6 +19,7 @@ import type {
   Worktree,
 } from '@/lib/opencode/types';
 import type {
+  CustomProviderInput,
   OpencodeConnectionSettings,
   PendingQuestionAnswer,
   PendingQuestionRequest,
@@ -135,6 +136,7 @@ export type OpencodeContextValue = {
   configureProvider: (providerId: string) => Promise<void>;
   completeAutomaticProviderOAuth: (providerId: string) => Promise<void>;
   setProviderAuth: (providerId: string, values: Record<string, string>) => Promise<void>;
+  addCustomProvider: (input: CustomProviderInput) => Promise<void>;
   removeProvider: (providerId: string) => Promise<void>;
   startProviderOAuth: (providerId: string, methodIndex: number, inputs?: Record<string, string>) => Promise<{ url: string; instructions?: string; method: 'auto' | 'code' }>;
   completeProviderOAuth: (providerId: string, methodIndex: number, code: string) => Promise<void>;

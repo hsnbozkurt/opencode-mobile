@@ -32,6 +32,9 @@ import { Platform } from 'react-native';
 
 import {
   buildClient,
+  buildCustomProviderConfigPatch,
+  removeGlobalProvider,
+  updateGlobalConfig,
   defaultConnectionSettings,
   getConnectionError,
   getNormalizedServerUrl,
@@ -40,6 +43,7 @@ import {
   rejectPendingQuestion,
   replyToPendingPermission,
   replyToPendingQuestion,
+  type CustomProviderInput,
   type PendingPermissionRequest,
   type PendingQuestionAnswer,
   type PendingQuestionRequest,
@@ -1308,14 +1312,13 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
       if (!latestConfig) {
         throw new Error('OpenCode did not return its configuration.');
       }
-      const enabledProviders = new Set(latestConfig.enabled_providers || []);
-      enabledProviders.add(providerId);
+      const nextEnabled = latestConfig.enabled_providers ? [...new Set([...latestConfig.enabled_providers, providerId])].sort() : undefined;
 
       const updatedConfig = (await client.config.update({
         config: {
           ...latestConfig,
           disabled_providers: (latestConfig.disabled_providers || []).filter((id) => id !== providerId),
-          enabled_providers: [...enabledProviders].sort(),
+          ...(nextEnabled === undefined ? {} : { enabled_providers: nextEnabled }),
         },
       })).data;
       if (!updatedConfig) {
@@ -1359,18 +1362,36 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
   const removeProvider = useCallback(async (providerId: string) => {
     await client.auth.remove({ providerID: providerId });
     const latestConfig = currentConfig || (await client.config.get()).data;
-    if (latestConfig) {
+    if (latestConfig?.provider?.[providerId]) {
+      // Custom provider (registered in config.provider): disable it globally so
+      // it leaves the provider catalog instead of only dropping the credentials.
+      // Global config writes dispose server instances, so reconnect to re-derive.
+      await removeGlobalProvider(settings, providerId, latestConfig.disabled_providers ?? [], latestConfig.enabled_providers);
+      await connect();
+    } else if (latestConfig) {
+      const nextEnabled = latestConfig.enabled_providers ? latestConfig.enabled_providers.filter((id) => id !== providerId) : undefined;
       const updatedConfig = (await client.config.update({
         config: {
           ...latestConfig,
           disabled_providers: [...new Set([...(latestConfig.disabled_providers || []), providerId])].sort(),
-          enabled_providers: (latestConfig.enabled_providers || []).filter((id) => id !== providerId),
+          ...(nextEnabled === undefined ? {} : { enabled_providers: nextEnabled }),
         },
       })).data;
-      setCurrentConfig(updatedConfig);
+      if (updatedConfig) {
+        setCurrentConfig(updatedConfig);
+      }
     }
     await refreshChatCapabilities();
-  }, [client, currentConfig, refreshChatCapabilities]);
+  }, [client, connect, currentConfig, refreshChatCapabilities, settings]);
+
+  const addCustomProvider = useCallback(
+    async (input: CustomProviderInput) => {
+      await updateGlobalConfig(settings, buildCustomProviderConfigPatch(input));
+      await connect();
+      await refreshChatCapabilities();
+    },
+    [connect, refreshChatCapabilities, settings],
+  );
 
   const startProviderOAuth = useCallback(
     async (providerId: string, methodIndex: number, inputs?: Record<string, string>) => {
@@ -2490,6 +2511,7 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
       configureProvider,
       completeAutomaticProviderOAuth,
       setProviderAuth,
+      addCustomProvider,
       removeProvider,
       startProviderOAuth,
       completeProviderOAuth,
@@ -2576,6 +2598,7 @@ export function OpencodeProvider({ children }: PropsWithChildren) {
       unrevertSession,
       configureProvider,
       completeAutomaticProviderOAuth,
+      addCustomProvider,
       currentMessages,
       currentUsage,
       latestAssistantTurnUsage,

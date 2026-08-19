@@ -28,6 +28,168 @@ export const defaultConnectionSettings: OpencodeConnectionSettings = {
   directory: '',
 };
 
+export type CustomProviderInput = {
+  id: string;
+  name: string;
+  baseURL: string;
+  apiKey?: string;
+  models: string[];
+};
+
+const EMULATOR_HOST_ALIAS = '10.0.2.2';
+
+/**
+ * Maps host loopback to the Android emulator's host alias for app-side fetches.
+ * The OpenCode server lives on the host, where `localhost` resolves to the host
+ * itself; the app runs in the emulator, where `localhost` is the device.
+ * Only rewrites the URL used for the local fetch — the saved config keeps the
+ * user's literal base URL so the server can still reach the gateway.
+ */
+export function getAppReachableBaseURL(baseURL: string) {
+  try {
+    const url = new URL(baseURL);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = EMULATOR_HOST_ALIAS;
+      return url.toString();
+    }
+  } catch {
+    // Not a parseable URL; return as-is and let the caller surface the error.
+  }
+  return baseURL;
+}
+
+/**
+ * Fetches the model catalog of an OpenAI-compatible gateway (`/v1/models` or
+ * `/models`, whichever responds). Returns the model IDs, or throws on failure.
+ */
+export async function fetchGatewayModels(baseURL: string, apiKey?: string): Promise<string[]> {
+  const trimmed = baseURL.trim();
+  const candidates = trimmed.endsWith('/v1') ? [`${trimmed}/models`] : [`${trimmed}/v1/models`, `${trimmed}/models`];
+  const headers = apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : undefined;
+  let lastError: unknown = new Error('No models endpoint responded.');
+
+  for (const candidate of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(getAppReachableBaseURL(candidate), { headers, signal: controller.signal });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        lastError = new Error(`Models endpoint returned HTTP ${response.status}.`);
+        continue;
+      }
+
+      const payload: unknown = await response.json();
+      const ids: string[] = [];
+      if (payload && typeof payload === 'object' && 'data' in payload && Array.isArray(payload.data)) {
+        for (const entry of payload.data) {
+          if (entry && typeof entry === 'object' && 'id' in entry && typeof entry.id === 'string' && entry.id.trim()) {
+            ids.push(entry.id);
+          }
+        }
+      }
+      if (ids.length > 0) {
+        return ids;
+      }
+      lastError = new Error('The gateway returned no model IDs.');
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Could not fetch gateway models.');
+}
+
+export type CustomProviderConfigPatch = {
+  provider: Record<
+    string,
+    {
+      npm: string;
+      name: string;
+      options: { baseURL: string; apiKey?: string };
+      models: Record<string, { name: string }>;
+    }
+  >;
+  disabled_providers: string[];
+  enabled_providers?: string[];
+};
+
+/**
+ * Builds the web-style global-config patch (`PATCH /global/config`) that registers
+ * an OpenAI-compatible custom provider. Mirrors the opencode web UI payload:
+ * `{ provider: { <id>: { npm, name, options, models } }, disabled_providers }`.
+ */
+export function buildCustomProviderConfigPatch(input: CustomProviderInput): CustomProviderConfigPatch {
+  const models = Object.fromEntries(
+    [...new Set(input.models.map((model) => model.trim()).filter(Boolean))].map((model) => [model, { name: model }]),
+  );
+  const entry = {
+    npm: '@ai-sdk/openai-compatible',
+    name: input.name.trim(),
+    options: {
+      baseURL: input.baseURL.trim(),
+      ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
+    },
+    models,
+  };
+
+  return {
+    provider: { [input.id.trim()]: entry },
+    disabled_providers: [],
+  };
+}
+
+/**
+ * Writes a custom-provider patch to the server's GLOBAL config (`PATCH
+ * /global/config`), matching the opencode web UI's add-provider flow. The web
+ * UI targets global scope so the provider is visible from every project, not
+ * just the currently active worktree; the SDK's project-scoped
+ * `client.config.update` hits `/config` instead, which would hide the provider
+ * from other projects.
+ */
+export async function updateGlobalConfig(
+  settings: OpencodeConnectionSettings,
+  patch: CustomProviderConfigPatch,
+): Promise<unknown> {
+  const normalized = normalizeServerUrl(settings.serverUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const headers = getRequestHeaders(settings);
+    const response = await fetch(`${normalized.origin}${joinUrlPath(normalized.pathPrefix, '/global/config')}`, {
+      method: 'PATCH',
+      headers: { ...(headers ?? {}), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`OpenCode rejected the provider update (HTTP ${response.status}).`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Removes a custom provider by disabling it in the GLOBAL config, matching the
+ * opencode web UI's disconnect flow. The server's config update only deep-merges
+ * (no delete verb exists), but disabled providers are excluded from the
+ * `/provider` catalog, so the provider disappears from the app and all projects.
+ */
+export async function removeGlobalProvider(
+  settings: OpencodeConnectionSettings,
+  providerId: string,
+  disabledProviders: string[],
+  enabledProviders: string[] | undefined,
+): Promise<unknown> {
+  return updateGlobalConfig(settings, {
+    provider: {},
+    disabled_providers: [...new Set([...disabledProviders, providerId])],
+    ...(enabledProviders === undefined ? {} : { enabled_providers: enabledProviders.filter((id) => id !== providerId) }),
+  });
+}
+
 type NormalizedServerUrl = {
   displayUrl: string;
   origin: string;

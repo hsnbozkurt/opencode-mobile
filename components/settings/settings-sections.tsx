@@ -232,6 +232,7 @@ type AiDefaultsSectionProps = {
   configuredProviders: ProviderOption[];
   enabledModelIds: Set<string>;
   expandedProviderId?: string;
+  onAddCustomProvider: () => void;
   onExpandedProviderChange: (providerId?: string) => void;
   onModelToggle: (modelId: string, checked: boolean) => void;
   onRemoveProvider: (providerId: string) => void;
@@ -246,6 +247,7 @@ export function AiDefaultsSection({
   configuredProviders,
   enabledModelIds,
   expandedProviderId,
+  onAddCustomProvider,
   onExpandedProviderChange,
   onModelToggle,
   onRemoveProvider,
@@ -270,8 +272,12 @@ export function AiDefaultsSection({
         </Text>
         <View style={styles.providerHeader}>
           <Text variant="labelLarge" style={{ color: palette.text }}>Configured providers</Text>
-          {unconfiguredProviders.length > 0 ? (
-            <NativeSelect
+          <View style={styles.providerHeaderActions}>
+            <Button mode="outlined" compact onPress={onAddCustomProvider} testID="settings-add-custom-provider-button">
+              Custom provider
+            </Button>
+            {unconfiguredProviders.length > 0 ? (
+              <NativeSelect
               onValueChange={onStartProviderConfiguration}
               options={unconfiguredProviders.map((provider) => ({
                 label: getProviderCopy(provider.id, provider.label).label,
@@ -298,6 +304,7 @@ export function AiDefaultsSection({
               )}
             />
           ) : null}
+          </View>
         </View>
 
         <View style={styles.chipWrap}>
@@ -712,6 +719,7 @@ const styles = StyleSheet.create({
   connectionStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   connectionStatusDot: { width: 10, height: 10, borderRadius: 999 },
   providerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  providerHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inlineSelectButton: { minHeight: 36, borderWidth: 1, borderRadius: 999, justifyContent: 'center', paddingHorizontal: 12 },
   inlineSelectButtonLabel: { fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
