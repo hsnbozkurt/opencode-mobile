@@ -39,7 +39,8 @@ Deployment model (device-verified):
 Flow:
 
 1. User taps "Set up on-device server" in Settings → the app launches a visible Termux session running the pinned setup script (Bun install, opencode clone at tag `v1.18.18`, dependency install, ripgrep, `allow-external-apps=true`).
-2. User taps "Start server" → a background Termux session runs the serve command from a `/sdcard` working directory (Bun's startup probe walks up from cwd and aborts inside `/data`, so the server cannot run from Termux home).
+2. User taps "Start server" → a background Termux session runs the serve command from Termux home (`/data/data/com.termux/files/home`). Termux can always read/write its own home, so no storage permission is needed — `/sdcard` is rejected by RunCommandService on devices where Termux lacks storage access ("working directory ... not readable permission denied").
+   - Caveat (unobserved): Bun's startup probe walks up from cwd; `/data` and `/data/data` are searchable (mode 0711) but not listable, so a probe that *lists* ancestors would fail from home. If that ever surfaces (EACCES on `/data` at Bun startup), the serve command needs a non-`/data` cwd such as `/storage/emulated/0/Android/data/com.termux`.
 3. The app switches the server URL to `http://127.0.0.1:4096` and reconnects.
 
 Requirements:

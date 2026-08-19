@@ -95,11 +95,14 @@ fi
 echo "[setup] done. OpenCode is ready to serve on port ${TERMUX_SERVER_PORT}."`;
 
 /**
- * Starts the on-device OpenCode server in a background Termux session. The
- * working directory must sit under /sdcard (or any path whose ancestors are
- * listable): Bun's startup probe walks up from cwd and aborts on /data
- * (untrusted_app cannot list it), which is why the server cannot run from
- * Termux home.
+ * Starts the on-device OpenCode server in a background Termux session. Runs
+ * from Termux home (always readable/writable by Termux — no storage
+ * permission needed; /sdcard is rejected by RunCommandService when Termux
+ * lacks storage access). Note: Bun's startup probe walks up from cwd; /data
+ * and /data/data are only searchable (mode 0711), not listable, so a probe
+ * that lists ancestors would fail from home. If that ever surfaces
+ * (EACCES at Bun startup), the serve command needs a non-/data cwd such as
+ * /storage/emulated/0/Android/data/com.termux.
  */
 const TERMUX_SERVE_COMMAND = `exec ${TERMUX_BUN} run --disable-bunfig --conditions=browser ${OPENCODE_ENTRY} serve --hostname 127.0.0.1 --port ${TERMUX_SERVER_PORT}`;
 
@@ -189,7 +192,7 @@ function createLaunchRequest(script: string, background: boolean) {
   return {
     executable: TERMUX_SHELL,
     args: ['-lc', script],
-    workdir: '/sdcard',
+    workdir: TERMUX_HOME,
     background,
   };
 }
