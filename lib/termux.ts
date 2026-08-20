@@ -94,6 +94,9 @@ mkdir -p "$HOME_DIR/.termux"
 if ! grep -q '^allow-external-apps=' "$HOME_DIR/.termux/termux.properties" 2>/dev/null; then
   printf '\\nallow-external-apps=true\\n' >> "$HOME_DIR/.termux/termux.properties"
 fi
+echo "[setup] clearing install caches..."
+rm -rf "$HOME_DIR/.bun/install/cache" "$HOME_DIR/.cache" 2>/dev/null || true
+rm -f "$PREFIX/var/cache/apt/archives"/*.deb 2>/dev/null || true
 echo "[setup] done. OpenCode is ready to serve on port ${TERMUX_SERVER_PORT}."`;
 
 /**
